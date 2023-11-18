@@ -66,6 +66,65 @@ std::function<void(k_api::Base::ActionNotification)>
     };
 }
 
+bool example_move_to_home_position(k_api::Base::BaseClient* base)
+{
+    // Make sure the arm is in Single Level Servoing before executing an Action
+    auto servoingMode = k_api::Base::ServoingModeInformation();
+    servoingMode.set_servoing_mode(k_api::Base::ServoingMode::SINGLE_LEVEL_SERVOING);
+    base->SetServoingMode(servoingMode);
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    // Move arm to ready position
+    std::cout << "Moving the arm to a safe position" << std::endl;
+    auto action_type = k_api::Base::RequestedActionType();
+    action_type.set_action_type(k_api::Base::REACH_JOINT_ANGLES);
+    auto action_list = base->ReadAllActions(action_type);
+    auto action_handle = k_api::Base::ActionHandle();
+    action_handle.set_identifier(0);
+    for (auto action : action_list.action_list()) 
+    {
+        if (action.name() == "Home") 
+        {
+            action_handle = action.handle();
+        }
+    }
+
+    if (action_handle.identifier() == 0) 
+    {
+        std::cout << "Can't reach safe position, exiting" << std::endl;
+        return false;
+    } 
+    else 
+    {
+        // Connect to notification action topic
+        std::promise<k_api::Base::ActionEvent> finish_promise;
+        auto finish_future = finish_promise.get_future();
+        auto promise_notification_handle = base->OnNotificationActionTopic(
+            create_event_listener_by_promise(finish_promise),
+            k_api::Common::NotificationOptions()
+        );
+
+        // Execute action
+        base->ExecuteActionFromReference(action_handle);
+
+        // Wait for future value from promise
+        const auto status = finish_future.wait_for(TIMEOUT_DURATION);
+        base->Unsubscribe(promise_notification_handle);
+
+        if(status != std::future_status::ready)
+        {
+            std::cout << "Timeout on action notification wait" << std::endl;
+            return false;
+        }
+        const auto promise_event = finish_future.get();
+
+        std::cout << "Move to Home completed" << std::endl;
+        std::cout << "Promise value : " << k_api::Base::ActionEvent_Name(promise_event) << std::endl; 
+
+        return true;
+    }
+}
+
 
 bool move_to_cartesian_position(k_api::Base::BaseClient* base, const Pose& targetPose, k_api::BaseCyclic::BaseCyclicClient* base_cyclic)
 {
@@ -156,6 +215,7 @@ int main(int argc, char **argv)
 
     // core
     bool success = true;
+    success &= example_move_to_home_position(base);
     success &= move_to_cartesian_position(base, targetPose, base_feedback);
 
     // You can also refer to the 110-Waypoints examples if you want to execute
