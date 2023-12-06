@@ -1,1 +1,3 @@
 kinova_api/
+build/
+CMakeFiles/
