@@ -75,6 +75,9 @@ bool control_end_effector(k_api::Base::BaseClient* base, k_api::BaseCyclic::Base
     k_api::Base::JointSpeeds joint_speeds1;
     k_api::Base::JointTorques joint_torques;
 
+    // KDL::JntArray jnt_torque(chain.getNrOfJoints());
+
+
     // auto feedback = base_cyclic->RefreshFeedback();
     std::vector<float> torque_snapshot;
 
@@ -101,6 +104,7 @@ bool control_end_effector(k_api::Base::BaseClient* base, k_api::BaseCyclic::Base
         {
             // std::cout << "Torque of joint " << i << ": " << feedback.actuators(i).torque() << std::endl;
             torque_snapshot.push_back(feedback.actuators(i).torque());
+            // jnt_torque(i) = feedback.actuators(i).torque();
         }
         torque_history.push_back(torque_snapshot);
         
