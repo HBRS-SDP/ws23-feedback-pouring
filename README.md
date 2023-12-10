@@ -17,6 +17,20 @@ cd ~/feedback_pouring/src
 git clone https://github.com/HBRS-SDP/ws23-feedback-pouring.git .
 ```
 
+Adding kdl-parser
+```bash
+git clone https://github.com/orocos/orocos_kinematics_dynamics.git
+
+# clone this inside the repository
+
+# kdl-parser
+sudo apt-get install libkdl-parser-dev
+
+#urdf
+sudo apt-get install liburdfdom-dev
+
+```
+
 ## Build
 ```bash
 cd ~/feedback_pouring/build
