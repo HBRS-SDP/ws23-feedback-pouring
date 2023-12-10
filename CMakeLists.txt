@@ -34,9 +34,9 @@ if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/kinova_api/lib/release/libKortexApiCpp
 endif()
 
 # add subdirectories
-# add_subdirectory(orocos_kinematics_dynamics/orocos_kdl)
+add_subdirectory(orocos_kinematics_dynamics/orocos_kdl)
 
-# include_directories(${CMAKE_CURRENT_SOURCE_DIR}/orocos_kinematics_dynamics/orocos_kdl/src/)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/orocos_kinematics_dynamics/orocos_kdl/src/)
 
 add_compile_definitions(_OS_UNIX)
 
