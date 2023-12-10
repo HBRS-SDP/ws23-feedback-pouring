@@ -95,6 +95,67 @@ create_event_listener_by_ref(k_api::Base::ActionEvent &returnAction)
     };
 }
 
+bool control_end_effector(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclicClient *base_cyclic, std::vector<std::vector<float>> &torque_history, std::vector<KDL::Wrench> &wrench_history)
+{
+    std::cout << "Sending the angular velocities to the robot for 10 seconds..." << std::endl;
+
+    k_api::Base::JointSpeeds joint_speeds;
+    k_api::Base::JointTorques joint_torques;
+
+    Vector gravity(0.0, 0.0, -9.81);
+    double sample_frequency = 1000.0; // Hz
+    double estimation_gain = 45.0;
+    double filter_constant = 0.5;
+
+    // Create the KDL chain
+    KDL::Chain chain;
+    initialize_robot_urdf("../../src/feedback_pouring/urdf/gen3_robotiq_2f_85.urdf", chain, "base_link", "end_effector_link");
+
+    ChainExternalWrenchEstimator extwrench_estimator(chain, gravity, sample_frequency, estimation_gain, filter_constant);
+    KDL::JntArray jnt_torque(chain.getNrOfJoints());
+    KDL::JntArray jnt_pos(chain.getNrOfJoints());
+    KDL::JntArray jnt_vel(chain.getNrOfJoints());
+    Wrench f_tool_estimated;
+
+    std::vector<float> torque_snapshot;
+
+    std::vector<float> speeds;
+
+    int actuator_count = base->GetActuatorCount().count();
+
+    speeds = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, SPEED};
+    for (size_t i = 0; i < speeds.size(); ++i)
+    {
+        auto joint_speed = joint_speeds.add_joint_speeds();
+        joint_speed->set_joint_identifier(i);
+        joint_speed->set_value(speeds.at(i));
+        joint_speed->set_duration(1);
+    }
+    for (int time = 0; time <= 10; ++time)
+    {
+        base->SendJointSpeedsCommand(joint_speeds);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        auto feedback = base_cyclic->RefreshFeedback();
+        for (int i = 0; i < actuator_count; i++)
+        {
+
+            // torque_snapshot.push_back(feedback.actuators(i).torque());
+            jnt_torque.data(i) = feedback.actuators(i).torque();
+            jnt_pos.data(i) = feedback.actuators(i).position();
+            jnt_vel.data(i) = feedback.actuators(i).velocity();
+
+            extwrench_estimator.JntToExtWrench(jnt_pos, jnt_vel, jnt_torque, f_tool_estimated);
+        }
+
+        wrench_history.push_back(f_tool_estimated);
+    }
+
+    // Stop the robot
+    std::cout << "Stopping the robot" << std::endl;
+    base->Stop();
+
+    return true;
+}
 
 int main(int argc, char **argv)
 {
@@ -124,9 +185,27 @@ int main(int argc, char **argv)
     auto base = new k_api::Base::BaseClient(router);
     auto base_cyclic = new k_api::BaseCyclic::BaseCyclicClient(router);
 
-    // Creating KDL chain using URDF
-    KDL::Chain chain;
-    initialize_robot_urdf("../../src/feedback_pouring/urdf/gen3_robotiq_2f_85.urdf", chain, "base_link", "end_effector_link");
+    bool success = true;
+    std::vector<std::vector<float>> torque_history;
+    std::vector<KDL::Wrench> wrench_history;
+
+    success &= control_end_effector(base, base_cyclic, torque_history, wrench_history);
+
+    // Print wrench history
+    for (const auto &wrench : wrench_history)
+    {
+        std::cout << "Wrench (Force): "
+                  << wrench.force.x() << ", "
+                  << wrench.force.y() << ", "
+                  << wrench.force.z()
+                  << std::endl;
+
+        std::cout << "Wrench (Torque): "
+                  << wrench.torque.x() << ", "
+                  << wrench.torque.y() << ", "
+                  << wrench.torque.z()
+                  << std::endl;
+    }
 
     // Close API session
     session_manager->CloseSession();
@@ -141,5 +220,5 @@ int main(int argc, char **argv)
     delete router;
     delete transport;
 
-    return true;
+    return success ? 0 : 1;
 };
