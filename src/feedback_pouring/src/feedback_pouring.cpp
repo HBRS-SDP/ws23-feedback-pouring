@@ -9,7 +9,7 @@
 #include <DeviceManagerClientRpc.h>
 #include <DeviceConfigClientRpc.h>
 #include <Common.pb.h>
-#include <Base.pb.h>   
+#include <Base.pb.h>
 #include <BaseCyclic.pb.h>
 #include <InterconnectCyclic.pb.h>
 #include <fstream>
@@ -20,8 +20,7 @@
 #include "kdl_parser/kdl_parser.hpp"
 #include "chainexternalwrenchestimator.hpp"
 #include <cmath>
-#include <gnuplot-iostream.h>
-
+// #include <gnuplot-iostream.h>
 
 using namespace KDL;
 
@@ -31,7 +30,8 @@ namespace k_api = Kinova::Api;
 constexpr auto TIMEOUT_DURATION = std::chrono::seconds{20};
 
 // Data structure to represent a 3D pose
-struct Pose {
+struct Pose
+{
     double x;
     double y;
     double z;
@@ -51,45 +51,40 @@ const float SPEED = 1.8f;
 const float SPEED_STOP = -40.0f;
 // const float SPEED_STOP = 0.0f;
 
-Gnuplot gp;
+// Gnuplot gp;
 
-
-
-
-int initialize_robot_urdf(const std::string& urdf_path, KDL::Chain& robot_chain,
-                                 const std::string& base_link, const std::string& tool_link)
+int initialize_robot_urdf(const std::string &urdf_path, KDL::Chain &robot_chain,
+                          const std::string &base_link, const std::string &tool_link)
 {
-  KDL::Tree robot_tree;
+    KDL::Tree robot_tree;
 
-  // load the robot URDF into the KDL tree
-  if (!kdl_parser::treeFromFile(urdf_path, robot_tree))
-  {
-    // printf("Failed to construct KDL tree");
-    
-    return -1;
-  }
+    // load the robot URDF into the KDL tree
+    if (!kdl_parser::treeFromFile(urdf_path, robot_tree))
+    {
+        return -1;
+    }
 
-  // create the KDL chain
-  if (!robot_tree.getChain(base_link, tool_link, robot_chain))
-  {
-    // _logger->logError("Failed to get KDL chain");
-    return -1;
-  }
+    // create the KDL chain
+    if (!robot_tree.getChain(base_link, tool_link, robot_chain))
+    {
+        // _logger->logError("Failed to get KDL chain");
+        return -1;
+    }
 
-//   _logger->logInfo("Successfully initialized robot urdf");
-  return 0;
+    //   _logger->logInfo("Successfully initialized robot urdf");
+    return 0;
 }
 
 // Create an event listener that will set the promise action event to the exit value
 // Will set to either END or ABORT
 // Use finish_promise.get_future.get() to wait and get the value
-std::function<void(k_api::Base::ActionNotification)> 
-    create_event_listener_by_promise(std::promise<k_api::Base::ActionEvent>& finish_promise)
+std::function<void(k_api::Base::ActionNotification)>
+create_event_listener_by_promise(std::promise<k_api::Base::ActionEvent> &finish_promise)
 {
-    return [&finish_promise] (k_api::Base::ActionNotification notification)
+    return [&finish_promise](k_api::Base::ActionNotification notification)
     {
         const auto action_event = notification.action_event();
-        switch(action_event)
+        switch (action_event)
         {
         case k_api::Base::ActionEvent::ACTION_END:
         case k_api::Base::ActionEvent::ACTION_ABORT:
@@ -105,12 +100,12 @@ std::function<void(k_api::Base::ActionNotification)>
 // Will set to either END or ABORT
 // Read the value of returnAction until it is set
 std::function<void(k_api::Base::ActionNotification)>
-    create_event_listener_by_ref(k_api::Base::ActionEvent& returnAction)
+create_event_listener_by_ref(k_api::Base::ActionEvent &returnAction)
 {
     return [&returnAction](k_api::Base::ActionNotification notification)
     {
         const auto action_event = notification.action_event();
-        switch(action_event)
+        switch (action_event)
         {
         case k_api::Base::ActionEvent::ACTION_END:
         case k_api::Base::ActionEvent::ACTION_ABORT:
@@ -122,7 +117,7 @@ std::function<void(k_api::Base::ActionNotification)>
     };
 }
 
-bool gripper_control(k_api::Base::BaseClient*base)
+bool gripper_control(k_api::Base::BaseClient *base)
 {
     k_api::Base::GripperCommand gripper_command;
     gripper_command.set_mode(k_api::Base::GRIPPER_POSITION);
@@ -130,18 +125,16 @@ bool gripper_control(k_api::Base::BaseClient*base)
     finger->set_finger_identifier(1);
 
     for (float position = 0.0; position < 1.0; position += 0.1)
-        {
-            std::cout << "Setting position to " << position << std::endl;
-            finger->set_value(position);
-            base->SendGripperCommand(gripper_command);
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        }
-    
+    {
+        finger->set_value(position);
+        base->SendGripperCommand(gripper_command);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    }
 
     return true;
 }
 
-bool example_move_to_home_position(k_api::Base::BaseClient* base)
+bool example_move_to_home_position(k_api::Base::BaseClient *base)
 {
     // Make sure the arm is in Single Level Servoing before executing an Action
     auto servoingMode = k_api::Base::ServoingModeInformation();
@@ -156,28 +149,27 @@ bool example_move_to_home_position(k_api::Base::BaseClient* base)
     auto action_list = base->ReadAllActions(action_type);
     auto action_handle = k_api::Base::ActionHandle();
     action_handle.set_identifier(0);
-    for (auto action : action_list.action_list()) 
+    for (auto action : action_list.action_list())
     {
-        if (action.name() == "Home") 
+        if (action.name() == "Home")
         {
             action_handle = action.handle();
         }
     }
 
-    if (action_handle.identifier() == 0) 
+    if (action_handle.identifier() == 0)
     {
         std::cout << "Can't reach safe position, exiting" << std::endl;
         return false;
-    } 
-    else 
+    }
+    else
     {
         // Connect to notification action topic
         std::promise<k_api::Base::ActionEvent> finish_promise;
         auto finish_future = finish_promise.get_future();
         auto promise_notification_handle = base->OnNotificationActionTopic(
             create_event_listener_by_promise(finish_promise),
-            k_api::Common::NotificationOptions()
-        );
+            k_api::Common::NotificationOptions());
 
         // Execute action
         base->ExecuteActionFromReference(action_handle);
@@ -186,7 +178,7 @@ bool example_move_to_home_position(k_api::Base::BaseClient* base)
         const auto status = finish_future.wait_for(TIMEOUT_DURATION);
         base->Unsubscribe(promise_notification_handle);
 
-        if(status != std::future_status::ready)
+        if (status != std::future_status::ready)
         {
             std::cout << "Timeout on action notification wait" << std::endl;
             return false;
@@ -194,14 +186,13 @@ bool example_move_to_home_position(k_api::Base::BaseClient* base)
         const auto promise_event = finish_future.get();
 
         std::cout << "Move to Home completed" << std::endl;
-        std::cout << "Promise value : " << k_api::Base::ActionEvent_Name(promise_event) << std::endl; 
+        std::cout << "Promise value : " << k_api::Base::ActionEvent_Name(promise_event) << std::endl;
 
         return true;
     }
 }
 
-
-bool move_to_cartesian_position(k_api::Base::BaseClient* base, const Pose& targetPose, k_api::BaseCyclic::BaseCyclicClient* base_cyclic)
+bool move_to_cartesian_position(k_api::Base::BaseClient *base, const Pose &targetPose, k_api::BaseCyclic::BaseCyclicClient *base_cyclic)
 {
     std::cout << "Moving to Desired position" << std::endl;
 
@@ -224,10 +215,8 @@ bool move_to_cartesian_position(k_api::Base::BaseClient* base, const Pose& targe
     k_api::Base::ActionEvent event = k_api::Base::ActionEvent::UNSPECIFIED_ACTION_EVENT;
     auto reference_notification_handle = base->OnNotificationActionTopic(
         create_event_listener_by_ref(event),
-        k_api::Common::NotificationOptions()
-    );
+        k_api::Common::NotificationOptions());
 
-    std::cout << "Executing action" << std::endl;
     base->ExecuteAction(action);
 
     std::cout << "Waiting for movement to finish ..." << std::endl;
@@ -237,28 +226,25 @@ bool move_to_cartesian_position(k_api::Base::BaseClient* base, const Pose& targe
     // See angular examples for Promise alternative
     // Set a timeout after 20s of wait
     const auto timeout = std::chrono::system_clock::now() + TIMEOUT_DURATION;
-    while(event == k_api::Base::ActionEvent::UNSPECIFIED_ACTION_EVENT &&
-        std::chrono::system_clock::now() < timeout)
+    while (event == k_api::Base::ActionEvent::UNSPECIFIED_ACTION_EVENT &&
+           std::chrono::system_clock::now() < timeout)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     base->Unsubscribe(reference_notification_handle);
 
-    if(event == k_api::Base::ActionEvent::UNSPECIFIED_ACTION_EVENT)
+    if (event == k_api::Base::ActionEvent::UNSPECIFIED_ACTION_EVENT)
     {
         std::cout << "Timeout on action notification wait" << std::endl;
         return false;
     }
 
     std::cout << "Cartesian movement completed" << std::endl;
-    std::cout << "Reference value : " << k_api::Base::ActionEvent_Name(event) << std::endl;
 
     return true;
-
 }
-double find_gripper_mass(k_api::Base::BaseClient* base, k_api::BaseCyclic::BaseCyclicClient* base_cyclic, k_api::InterconnectCyclic::InterconnectCyclicClient* interconnect_cyclic)
+double find_gripper_mass(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclicClient *base_cyclic, k_api::InterconnectCyclic::InterconnectCyclicClient *interconnect_cyclic)
 {
-    std::cout << "Finding the mass of the gripper" << std::endl;
 
     k_api::Base::JointSpeeds joint_speeds;
     k_api::Base::JointSpeeds joint_speeds1;
@@ -285,13 +271,12 @@ double find_gripper_mass(k_api::Base::BaseClient* base, k_api::BaseCyclic::BaseC
     initialize_robot_urdf("../../src/feedback_pouring/urdf/GEN3-7DOF-VISION_ARM_URDF_V12.urdf", chain, "base_link", "end_effector_link");
 
     ChainExternalWrenchEstimator extwrench_estimator(chain, gravity, sample_frequency, estimation_gain, filter_constant, eps, n);
-    
 
     KDL::JntArray jnt_torque(chain.getNrOfJoints());
     KDL::JntArray jnt_pos(chain.getNrOfJoints());
     KDL::JntArray jnt_vel(chain.getNrOfJoints());
     KDL::JntArray jnt_pos_fixed(chain.getNrOfJoints());
-    
+
     Wrench wrench;
     Wrench initial_wrench;
 
@@ -301,31 +286,29 @@ double find_gripper_mass(k_api::Base::BaseClient* base, k_api::BaseCyclic::BaseC
     {
         auto feedback_init = base_cyclic->RefreshFeedback();
         for (int i = 0; i < chain.getNrOfJoints(); i++)
-            { 
-                jnt_torque.data(i) = feedback_init.actuators(i).torque();
-                jnt_pos.data(i) = DEG_TO_RAD(feedback_init.actuators(i).position());
-                jnt_vel.data(i) = DEG_TO_RAD(feedback_init.actuators(i).velocity());
-            }
+        {
+            jnt_torque.data(i) = feedback_init.actuators(i).torque();
+            jnt_pos.data(i) = DEG_TO_RAD(feedback_init.actuators(i).position());
+            jnt_vel.data(i) = DEG_TO_RAD(feedback_init.actuators(i).velocity());
+        }
 
-        extwrench_estimator.JntToExtWrench(jnt_pos, jnt_vel, jnt_torque, initial_wrench);  
+        extwrench_estimator.JntToExtWrench(jnt_pos, jnt_vel, jnt_torque, initial_wrench);
 
         imu_acceleration = KDL::Vector(
-        feedback_init.interconnect().imu_acceleration_x(),
-        feedback_init.interconnect().imu_acceleration_y(),
-        feedback_init.interconnect().imu_acceleration_z());
+            feedback_init.interconnect().imu_acceleration_x(),
+            feedback_init.interconnect().imu_acceleration_y(),
+            feedback_init.interconnect().imu_acceleration_z());
 
-        auto acceleration = std::sqrt(imu_acceleration.x()*imu_acceleration.x() + imu_acceleration.y()*imu_acceleration.y());
+        auto acceleration = std::sqrt(imu_acceleration.x() * imu_acceleration.x() + imu_acceleration.y() * imu_acceleration.y());
 
-        
-        std::cout << "Inital Force_x: " << initial_wrench.force.x() << " Force_y: " << initial_wrench.force.y() << " Force_z: " << initial_wrench.force.z() << std::endl;
 
         force_req = initial_wrench.force.Norm();
         std::cout << "Force: " << force_req << std::endl;
 
         // Mass of the gripper
-        gripper_mass = sqrt(initial_wrench.force.x()*initial_wrench.force.x() + initial_wrench.force.y()*initial_wrench.force.y())/acceleration;
+        gripper_mass = sqrt(initial_wrench.force.x() * initial_wrench.force.x() + initial_wrench.force.y() * initial_wrench.force.y()) / acceleration;
 
-        current_gripper = (floor(gripper_mass *100.0))/100.0;
+        current_gripper = (floor(gripper_mass * 100.0)) / 100.0;
         std::cout << "Gripper Mass: " << gripper_mass << std::endl;
 
         if (!gripper_boolean)
@@ -333,25 +316,21 @@ double find_gripper_mass(k_api::Base::BaseClient* base, k_api::BaseCyclic::BaseC
             if (prev_gripper != current_gripper)
             {
                 prev_gripper = current_gripper;
-            } 
-            else{
+            }
+            else
+            {
                 gripper_boolean = true;
                 gripper = current_gripper;
                 break;
             }
         }
-
     }
-    
+
     return gripper;
-
-
 }
 
-
-bool control_end_effector(k_api::Base::BaseClient* base, k_api::BaseCyclic::BaseCyclicClient* base_cyclic, k_api::InterconnectCyclic::InterconnectCyclicClient* interconnect_cyclic)
+bool control_end_effector(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclicClient *base_cyclic, k_api::InterconnectCyclic::InterconnectCyclicClient *interconnect_cyclic)
 {
-    std::cout << "Controlling the End Effector" << std::endl;
 
     k_api::Base::JointSpeeds joint_speeds;
     k_api::Base::JointSpeeds joint_speeds1;
@@ -367,16 +346,15 @@ bool control_end_effector(k_api::Base::BaseClient* base, k_api::BaseCyclic::Base
     // Create the KDL chain
     KDL::Chain chain;
     initialize_robot_urdf("../../src/feedback_pouring/urdf/GEN3-7DOF-VISION_ARM_URDF_V12.urdf", chain, "base_link", "end_effector_link");
-    
+
     ChainExternalWrenchEstimator extwrench_estimator(chain, gravity, sample_frequency, estimation_gain, filter_constant, eps, n);
-    
 
     KDL::JntArray jnt_torque(chain.getNrOfJoints());
     KDL::JntArray jnt_pos(chain.getNrOfJoints());
-    KDL::JntArray jnt_pos_stop(chain.getNrOfJoints());    
+    KDL::JntArray jnt_pos_stop(chain.getNrOfJoints());
     KDL::JntArray jnt_vel(chain.getNrOfJoints());
     KDL::JntArray jnt_pos_fixed(chain.getNrOfJoints());
-    
+
     Wrench wrench;
     Wrench initial_wrench;
 
@@ -384,30 +362,29 @@ bool control_end_effector(k_api::Base::BaseClient* base, k_api::BaseCyclic::Base
 
     std::vector<float> speeds1;
     std::vector<float> speeds;
-       
+
     int actuator_count = base->GetActuatorCount().count();
     const int last_actuator_index = 6;
 
     extwrench_estimator.setInitialMomentum(jnt_pos, jnt_vel);
 
-    for (size_t i = 0 ; i < actuator_count; ++i)
-        {
-            auto joint_speed = joint_speeds.add_joint_speeds();
-            joint_speed->set_joint_identifier(i);
-            joint_speed->set_value(0.0f);
-            joint_speed->set_duration(1);
-        }
-    for (size_t i = 0 ; i < actuator_count; ++i)
-        {
-            auto joint_speed1 = joint_speeds1.add_joint_speeds();
-            joint_speed1->set_joint_identifier(i);
-            joint_speed1->set_value(0.0f);
-            joint_speed1->set_duration(1);
-        }
-    
+    for (size_t i = 0; i < actuator_count; ++i)
+    {
+        auto joint_speed = joint_speeds.add_joint_speeds();
+        joint_speed->set_joint_identifier(i);
+        joint_speed->set_value(0.0f);
+        joint_speed->set_duration(1);
+    }
+    for (size_t i = 0; i < actuator_count; ++i)
+    {
+        auto joint_speed1 = joint_speeds1.add_joint_speeds();
+        joint_speed1->set_joint_identifier(i);
+        joint_speed1->set_value(0.0f);
+        joint_speed1->set_duration(1);
+    }
+
     float i = 0.05;
     float decremental_speed = 0.0f;
-    float initial_mass = 0.0f;
     float percentage = 20;
     bool loop = true;
     bool stop_loop = false;
@@ -424,18 +401,17 @@ bool control_end_effector(k_api::Base::BaseClient* base, k_api::BaseCyclic::Base
     double prev_force_x = 0.0;
     double prev_force_y = 0.0;
     double prev_force_z = 0.0;
+    float initial_mass = 0.0f;
+    float final_mass = 0.0f;
 
     std::vector<std::pair<double, double>> combined;
     std::vector<std::pair<double, double>> Fxy_pts;
     std::vector<std::pair<double, double>> Fyy_pts;
 
-
-
-
-    while(loop)
-    {   
+    while (loop)
+    {
         auto feedback_init = base_cyclic->RefreshFeedback();
-        
+
         imu_acceleration = KDL::Vector(
             feedback_init.interconnect().imu_acceleration_x(),
             feedback_init.interconnect().imu_acceleration_y(),
@@ -446,145 +422,135 @@ bool control_end_effector(k_api::Base::BaseClient* base, k_api::BaseCyclic::Base
         // auto acceleration = std::sqrt(imu_acceleration.x()*imu_acceleration.x() + imu_acceleration.y()*imu_acceleration.y());
         double acceleration = imu_acceleration.Norm();
         for (int i = 0; i < chain.getNrOfJoints(); i++)
-        { 
+        {
             jnt_torque.data(i) = feedback_init.actuators(i).torque();
             jnt_pos.data(i) = DEG_TO_RAD(feedback_init.actuators(i).position());
             jnt_vel.data(i) = DEG_TO_RAD(feedback_init.actuators(i).velocity());
         }
 
-        extwrench_estimator.JntToExtWrench(jnt_pos, jnt_vel, jnt_torque, wrench);  
+        extwrench_estimator.JntToExtWrench(jnt_pos, jnt_vel, jnt_torque, wrench);
 
         // std::cout << "Force_x: " << wrench.force.x() << " Force_y: " << wrench.force.y() << " Force_z: " << wrench.force.z() << std::endl;
 
         // double force = std::sqrt(wrench.force.x()*wrench.force.x() + wrench.force.y()*wrench.force.y());
         double force = wrench.force.Norm() - 83.75;
         // auto mass = ( (force/acceleration) - (gripper_mass + 0.00));
-        auto mass = force/acceleration;
-
-        std::cout << "Mass: " << mass << std::endl;
-        std::cout << "Target Mass: " << target_mass << std::endl;
+        auto mass = force / acceleration;
         
-        float mass_extract_current = (floor(mass *1000.0))/1000.0;
+        // std::cout << "Enter the percentage of mass to be poured " << mass << std::endl;
+        // std:: cin >> percentage;
 
-        if (!target_mass_set) {
+        float mass_extract_current = (floor(mass * 1000.0)) / 1000.0;
+
+        if (!target_mass_set)
+        {
             std::this_thread::sleep_for(std::chrono::milliseconds(20));
 
-            if (mass_extract_previous != mass_extract_current ){
-                mass_extract_previous = mass_extract_current;
-
-            } else if (mass_extract_current > 0.09) {
-                target_mass = mass * (1 - percentage/100);
-                std::cout << "Target Mass is set to: " << target_mass << std::endl;
-                target_mass_set = true;
-                
-           }
-        }
-
-        if(target_mass)
-        {   
-            if (mass > (target_mass + 0.1 * target_mass))
+            if (mass_extract_previous != mass_extract_current)
             {
-                decremental_speed = SPEED/i;
-                std::cout << "Decremental Speed: " << decremental_speed << std::endl;
-                std :: cout << "i_value: " << i << std::endl;
+                mass_extract_previous = mass_extract_current;
+            }
+            else if (mass_extract_current > 0.09)
+            {
+                initial_mass = mass;
+                target_mass = mass * (1 - percentage / 100);
+                // std::cout << "Calculating mass while pouring: " << target_mass << std::endl;
+                final_mass = target_mass;
+                target_mass_set = true;
+            }
+        }
+        std::cout << "***** Pouring in progress *****" << std::endl;
+        if (target_mass)
+        {
+            if (mass > (target_mass + 0.15 * target_mass))
+            {
+                decremental_speed = SPEED / i;
                 // joint_speeds.mutable_joint_speeds(last_actuator_index)->set_value(decremental_speed);
                 joint_speeds.mutable_joint_speeds(last_actuator_index)->set_value(SPEED);
                 base->SendJointSpeedsCommand(joint_speeds);
             }
-            else if (mass < (target_mass + 0.1 * target_mass))
-            {   
+            else if (mass < (target_mass + 0.15 * target_mass))
+            {
                 while (1)
                 {
 
                     auto feedback_stop = base_cyclic->RefreshFeedback();
                     for (int i = 0; i < chain.getNrOfJoints(); i++)
-                    { 
+                    {
                         jnt_pos_stop.data(i) = DEG_TO_RAD(feedback_stop.actuators(i).position());
                     }
-                    // std :: cout << "Last Actuator Position: " << RAD_TO_DEG(jnt_pos_stop.data(6)) << std::endl;
                     joint_speeds1.mutable_joint_speeds(last_actuator_index)->set_value(SPEED_STOP);
                     base->SendJointSpeedsCommand(joint_speeds1);
-                    if (RAD_TO_DEG(jnt_pos_stop.data(6)) <88)
+                    if (RAD_TO_DEG(jnt_pos_stop.data(6)) < 88)
                     {
-    
+
                         break;
                     }
-                
                 }
 
                 loop = false;
-                
             }
-
         }
-
 
         // if (i <100)
         // {
         //     joint_speeds.mutable_joint_speeds(last_actuator_index)->set_value(SPEED);
         //     base->SendJointSpeedsCommand(joint_speeds);
-            
+
         //     for (int i = 0; i < chain.getNrOfJoints(); i++)
-        //     { 
+        //     {
         //         std::cout << "Joint " << i << " Position: " << RAD_TO_DEG(jnt_pos.data(i)) << std::endl;
         //     }
 
         // }
         // else if (i >= 100)
         // {
-        //     // std :: cout << "Last Actuator Position: " << RAD_TO_DEG(jnt_pos.data(6)) << std::endl;
 
         //     while (1)
         //     {
 
         //         auto feedback_stop = base_cyclic->RefreshFeedback();
         //         for (int i = 0; i < chain.getNrOfJoints(); i++)
-        //         { 
+        //         {
         //             jnt_pos_stop.data(i) = DEG_TO_RAD(feedback_stop.actuators(i).position());
         //         }
-        //         std :: cout << "Last Actuator Position: " << RAD_TO_DEG(jnt_pos_stop.data(6)) << std::endl;
         //         joint_speeds1.mutable_joint_speeds(last_actuator_index)->set_value(SPEED_STOP);
         //         base->SendJointSpeedsCommand(joint_speeds1);
         //         if (RAD_TO_DEG(jnt_pos_stop.data(6)) <88)
         //         {
-   
+
         //             break;
         //         }
-               
+
         //     }
         //     loop = false;
-                
+
         // }
-
-
-
 
         // joint_speeds.mutable_joint_speeds(last_actuator_index)->set_value(SPEED);
         // base->SendJointSpeedsCommand(joint_speeds);
 
-        i = i+0.01;
-
-
+        i = i + 0.01;
     }
 
-
     // Stop the robot
+    std::cout << "Initial mass ----> " << initial_mass << std::endl;
+    std::cout << "Final mass ----> " << final_mass << std::endl;
     std::cout << "Stopping the robot" << std::endl;
     base->Stop();
 
     return true;
-
 }
-
 
 int main(int argc, char **argv)
 {
 
-     // Create API objects
-    auto error_callback = [](k_api::KError err){ cout << "_________ callback error _________" << err.toString(); };
+    // Create API objects
+    auto error_callback = [](k_api::KError err)
+    { cout << "_________ callback error _________" << err.toString(); };
     auto transport = new k_api::TransportClientTcp();
     auto router = new k_api::RouterClient(transport, error_callback);
-    transport->connect("192.168.1.10", PORT); 
+    transport->connect("192.168.1.10", PORT);
     // 192.168.1.12 for another arm mounted to table
 
     // Set session data connection information
@@ -612,15 +578,11 @@ int main(int argc, char **argv)
     // core
     // Example core
     bool success = true;
-    double gripper_pallavi = 0.0f;
     success &= example_move_to_home_position(base);
     success &= move_to_cartesian_position(base, targetPose, base_cyclic);
-    // gripper_pallavi =  find_gripper_mass(base, base_cyclic, interconnect_cyclic);
-    std::cout << "Gripper Mass returned: " << gripper_pallavi << std::endl;
+    // gripper_ =  find_gripper_mass(base, base_cyclic, interconnect_cyclic);
 
     success &= control_end_effector(base, base_cyclic, interconnect_cyclic);
-
-        
 
     // Close API session
     session_manager->CloseSession();
@@ -635,5 +597,5 @@ int main(int argc, char **argv)
     delete router;
     delete transport;
 
-    return success ? 0: 1;
+    return success ? 0 : 1;
 };

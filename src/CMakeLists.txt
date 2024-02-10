@@ -9,13 +9,12 @@ include(FetchContent)
 set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/../install)
 
 Set(FETCHCONTENT_QUIET FALSE)
-
 # check if kinova api exists
 if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/kinova_api/lib/release/libKortexApiCpp.a)
     message(WARNING "kinova_api not found.")
     message("Downloading file...")
     File(DOWNLOAD 
-        https://artifactory.kinovaapps.com/artifactory/generic-public/kortex/API/2.6.0/linux_x86-64_x86_gcc.zip 
+        https://artifactory.kinovaapps.com/artifactory/generic-public/kortex/API/2.6.0/linux_x86_64_gcc_5.4.zip 
         ${CMAKE_CURRENT_SOURCE_DIR}/kinova_api.zip 
         SHOW_PROGRESS STATUS DOWNLOAD_RESULT)
     list(GET DOWNLOAD_RESULT 0 DOWNLOAD_RESULT_CODE)
