@@ -20,6 +20,7 @@
 #include "kdl_parser/kdl_parser.hpp"
 #include "chainexternalwrenchestimator.hpp"
 #include <cmath>
+#include "constants.h"
 // #include <gnuplot-iostream.h>
 
 using namespace KDL;
@@ -160,7 +161,8 @@ double find_gripper_mass(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseC
 
     // Create the KDL chain
     KDL::Chain chain;
-    initialize_robot_urdf("../../src/feedback_pouring/urdf/GEN3-7DOF-VISION_ARM_URDF_V12.urdf", chain, "base_link", "end_effector_link");
+    // initialize_robot_urdf("../../src/feedback_pouring/urdf/GEN3-7DOF-VISION_ARM_URDF_V12.urdf", chain, "base_link", "end_effector_link");
+    initialize_robot_urdf("../../src/feedback_pouring/urdf/"+URDF_FILE_NAME+".urdf", chain, "base_link", "end_effector_link");
 
     ChainExternalWrenchEstimator extwrench_estimator(chain, gravity, sample_frequency, estimation_gain, filter_constant, eps, n);
 
@@ -237,7 +239,8 @@ bool control_end_effector(k_api::Base::BaseClient *base, k_api::BaseCyclic::Base
 
     // Create the KDL chain
     KDL::Chain chain;
-    initialize_robot_urdf("../../src/feedback_pouring/urdf/GEN3-7DOF-VISION_ARM_URDF_V12.urdf", chain, "base_link", "end_effector_link");
+    // initialize_robot_urdf("../../src/feedback_pouring/urdf/GEN3-7DOF-VISION_ARM_URDF_V12.urdf", chain, "base_link", "end_effector_link");
+    initialize_robot_urdf("../../src/feedback_pouring/urdf/"+URDF_FILE_NAME+".urdf", chain, "base_link", "end_effector_link");
 
     ChainExternalWrenchEstimator extwrench_estimator(chain, gravity, sample_frequency, estimation_gain, filter_constant, eps, n);
 
@@ -403,13 +406,13 @@ int main(int argc, char **argv)
     { cout << "_________ callback error _________" << err.toString(); };
     auto transport = new k_api::TransportClientTcp();
     auto router = new k_api::RouterClient(transport, error_callback);
-    transport->connect("192.168.1.10", PORT);
+    transport->connect(ROBOT_IP, PORT);
     // 192.168.1.12 for another arm mounted to table
 
     // Set session data connection information
     auto create_session_info = k_api::Session::CreateSessionInfo();
-    create_session_info.set_username("admin");
-    create_session_info.set_password("admin");
+    create_session_info.set_username(USER_NAME);
+    create_session_info.set_password(PASSWORD);
     create_session_info.set_session_inactivity_timeout(60000);   // (milliseconds)
     create_session_info.set_connection_inactivity_timeout(2000); // (milliseconds)
 
