@@ -1,51 +1,36 @@
 # ws23-feedback-pouring
-Pouring the liquid/cereals using Kinnova arm with force estimation feedback
+Pouring the liquid/cereals using the Kinova arm with force estimation feedback
 
-## Setup
-Create a workspace in your local machine
 
-```bash
-mkdir ~/feedback_pouring && cd ~/feedback_pouring
+## Introduction
 
-mkdir src
-mkdir build
-```
+This project demonstrates the implementation of feedback-controlled pouring using a Kinova robotic arm and the Kortex API. The goal is to accurately estimate the pouring weight using a wrench estimator to provide feedback control during pouring tasks.
 
-clone the repository in src 
-```bash
-cd ~/feedback_pouring/src
-git clone https://github.com/HBRS-SDP/ws23-feedback-pouring.git .
-```
+This repository is developed by the Autonomous Systems group at Hochschule Bonn-Rhein-Sieg. The code in this repository is Kortex API-based and is developed using a single Kinova arm.
 
-Adding kdl-parser
-```bash
-git clone https://github.com/orocos/orocos_kinematics_dynamics.git
+# Dependencies
 
-# clone this inside the repository
+This repository depends on the below components. 
 
-# kdl-parser
-sudo apt-get install libkdl-parser-dev
+`Kinova Kortex API`
+`KDL (Kinematics and Dynamics Library)`
+`URDF (Unified Robot Description Format) Parser`
+`External Wrench Estimator`
 
-#urdf
-sudo apt-get install liburdfdom-dev
+## Packages
 
-```
+### Technologies
+- Robot Platform: [KINOVA](https://www.kinovarobotics.com/resources)
+- OS: Ubuntu 20.04 / 22.04 LTS
+- Middleware: Kinova Kortex API
+- Libraries: Kinematics and Dynamics Libraries (KDL)
 
-## Build
-```bash
-cd ~/feedback_pouring/build
+### Setup and Usage of Customized Package
+Please refer to the detailed steps provided to setup the environment and use it for the project on the Wiki page - [here](https://github.com/HBRS-SDP/ws23-feedback-pouring/wiki)
 
-# cmake
-cmake ../src/
 
-# build
-cmake --build .
-```
+## Acknowledgments
 
-## run
-```bash
-cd ~/feedback_pouring/outputs/feedback_pouring
-
-# run the executable file
-./filename
-```
+The guides who supported and mentored us throughout this journey were: 
+* Minh, Djordje, Santosh Thoduka, Vamshi, Kishan 
+* the MAS staff and professors who have provided their advice and support
