@@ -19,5 +19,6 @@ const std::string ROBOT_IP = "192.168.1.12";
 const std::string USER_NAME = "admin";
 const std::string PASSWORD = "admin";
 const Pose TARGET_POSE = {0.548, -0.289, 0.133, 90.11, -0.002, 87.125};
+const float PERCENT = 20;
 
 #endif // CONSTANTS_H

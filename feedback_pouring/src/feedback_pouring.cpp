@@ -30,7 +30,7 @@ namespace k_api = Kinova::Api;
 // Maximum allowed waiting time during actions
 constexpr auto TIMEOUT_DURATION = std::chrono::seconds{20};
 
-// // Data structure to represent a 3D pose
+// Data structure to represent a 3D pose
 // struct Pose
 // {
 //     double x;
@@ -391,7 +391,8 @@ bool control_end_effector(k_api::Base::BaseClient *base, k_api::BaseCyclic::Base
 
     float i = 0.05;
     float decremental_speed = 0.0f;
-    float percentage = 20;
+    // float percentage = 20;
+    float percentage = PERCENT;
     bool loop = true;
     bool stop_loop = false;
     double gripper_mass = 8.75;
