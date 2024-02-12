@@ -1,7 +1,6 @@
 # ws23-feedback-pouring
 Pouring the liquid/cereals using the Kinova arm with weight estimation feedback
 
-
 ## Introduction
 
 This project demonstrates the implementation of feedback-controlled pouring using a Kinova robotic arm and the Kortex API. 
@@ -36,9 +35,9 @@ Please refer to the detailed steps provided to set the environment and use it fo
 - Run the executable file, and give the user command for the amount of liquid/cereal to be poured.
 - Wait for the execution to complete the pouring task.
 - Remove the bottle and weigh again using the weighing system manually.
-- To validate the desired pouring completion, compare the manual weight measurement with the API weight measurement. 
+- To validate the desired pouring completion, compare the manual weight measurement with the API weight measurement.
 
-
+You can find the videos regarding this project [here](https://drive.google.com/drive/folders/1Qza58NAdH5Lb0HeMEsk8YwdW3HmIjaQ4?usp=sharing)
 
 ## Acknowledgments
 

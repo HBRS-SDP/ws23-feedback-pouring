@@ -135,6 +135,117 @@ bool gripper_control(k_api::Base::BaseClient *base)
     return true;
 }
 
+bool example_move_to_home_position(k_api::Base::BaseClient* base)
+{
+    // Make sure the arm is in Single Level Servoing before executing an Action
+    auto servoingMode = k_api::Base::ServoingModeInformation();
+    servoingMode.set_servoing_mode(k_api::Base::ServoingMode::SINGLE_LEVEL_SERVOING);
+    base->SetServoingMode(servoingMode);
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    // Move arm to ready position
+    auto action_type = k_api::Base::RequestedActionType();
+    action_type.set_action_type(k_api::Base::REACH_JOINT_ANGLES);
+    auto action_list = base->ReadAllActions(action_type);
+    auto action_handle = k_api::Base::ActionHandle();
+    action_handle.set_identifier(0);
+    for (auto action : action_list.action_list()) 
+    {
+        if (action.name() == "Home") 
+        {
+            action_handle = action.handle();
+        }
+    }
+
+    if (action_handle.identifier() == 0) 
+    {
+        std::cout << "Can't reach safe position, exiting" << std::endl;
+        return false;
+    } 
+    else 
+    {
+        // Connect to notification action topic
+        std::promise<k_api::Base::ActionEvent> finish_promise;
+        auto finish_future = finish_promise.get_future();
+        auto promise_notification_handle = base->OnNotificationActionTopic(
+            create_event_listener_by_promise(finish_promise),
+            k_api::Common::NotificationOptions()
+        );
+
+        // Execute action
+        base->ExecuteActionFromReference(action_handle);
+
+        // Wait for future value from promise
+        const auto status = finish_future.wait_for(TIMEOUT_DURATION);
+        base->Unsubscribe(promise_notification_handle);
+
+        if(status != std::future_status::ready)
+        {
+            std::cout << "Timeout on action notification wait" << std::endl;
+            return false;
+        }
+        const auto promise_event = finish_future.get();
+
+        // std::cout << "Move to Home completed" << std::endl;
+        // std::cout << "Promise value : " << k_api::Base::ActionEvent_Name(promise_event) << std::endl; 
+
+        return true;
+    }
+}
+
+
+bool arm_initialisation(k_api::Base::BaseClient* base, const Pose& targetPose, k_api::BaseCyclic::BaseCyclicClient* base_cyclic)
+{
+
+    auto action = k_api::Base::Action();
+    action.set_name("Move to Cartesian Position");
+    action.set_application_data("");
+
+    auto constrained_pose = action.mutable_reach_pose();
+    auto pose = constrained_pose->mutable_target_pose();
+    pose->set_x(targetPose.x);
+    pose->set_y(targetPose.y);
+    pose->set_z(targetPose.z);
+    pose->set_theta_x(targetPose.theta_x);
+    pose->set_theta_y(targetPose.theta_y);
+    pose->set_theta_z(targetPose.theta_z);
+
+    // Connect to notification action topic
+    // (Reference alternative)
+    // See angular examples for Promise alternative
+    k_api::Base::ActionEvent event = k_api::Base::ActionEvent::UNSPECIFIED_ACTION_EVENT;
+    auto reference_notification_handle = base->OnNotificationActionTopic(
+        create_event_listener_by_ref(event),
+        k_api::Common::NotificationOptions()
+    );
+
+    base->ExecuteAction(action);
+
+    // Wait for reference value to be set
+    // (Reference alternative)
+    // See angular examples for Promise alternative
+    // Set a timeout after 20s of wait
+    const auto timeout = std::chrono::system_clock::now() + TIMEOUT_DURATION;
+    while(event == k_api::Base::ActionEvent::UNSPECIFIED_ACTION_EVENT &&
+        std::chrono::system_clock::now() < timeout)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    base->Unsubscribe(reference_notification_handle);
+
+    if(event == k_api::Base::ActionEvent::UNSPECIFIED_ACTION_EVENT)
+    {
+        std::cout << "Timeout on action notification wait" << std::endl;
+        return false;
+    }
+
+    // std::cout << "Cartesian movement completed" << std::endl;
+    // std::cout << "Reference value : " << k_api::Base::ActionEvent_Name(event) << std::endl;
+
+    return true;
+
+}
+
 
 double find_gripper_mass(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclicClient *base_cyclic, k_api::InterconnectCyclic::InterconnectCyclicClient *interconnect_cyclic)
 {
@@ -161,7 +272,8 @@ double find_gripper_mass(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseC
 
     // Create the KDL chain
     KDL::Chain chain;
-    initialize_robot_urdf("../../src/feedback_pouring/urdf/GEN3-7DOF-VISION_ARM_URDF_V12.urdf", chain, "base_link", "end_effector_link");
+    // initialize_robot_urdf("../../src/feedback_pouring/urdf/GEN3-7DOF-VISION_ARM_URDF_V12.urdf", chain, "base_link", "end_effector_link");
+    initialize_robot_urdf("../../src/feedback_pouring/urdf/"+URDF_FILE_NAME+".urdf", chain, "base_link", "end_effector_link");
 
     ChainExternalWrenchEstimator extwrench_estimator(chain, gravity, sample_frequency, estimation_gain, filter_constant, eps, n);
 
@@ -238,7 +350,8 @@ bool control_end_effector(k_api::Base::BaseClient *base, k_api::BaseCyclic::Base
 
     // Create the KDL chain
     KDL::Chain chain;
-    initialize_robot_urdf("../../src/feedback_pouring/urdf/GEN3-7DOF-VISION_ARM_URDF_V12.urdf", chain, "base_link", "end_effector_link");
+    // initialize_robot_urdf("../../src/feedback_pouring/urdf/GEN3-7DOF-VISION_ARM_URDF_V12.urdf", chain, "base_link", "end_effector_link");
+    initialize_robot_urdf("../../src/feedback_pouring/urdf/"+URDF_FILE_NAME+".urdf", chain, "base_link", "end_effector_link");
 
     ChainExternalWrenchEstimator extwrench_estimator(chain, gravity, sample_frequency, estimation_gain, filter_constant, eps, n);
 
@@ -405,13 +518,13 @@ int main(int argc, char **argv)
     { cout << "_________ callback error _________" << err.toString(); };
     auto transport = new k_api::TransportClientTcp();
     auto router = new k_api::RouterClient(transport, error_callback);
-    transport->connect("192.168.1.10", PORT);
+    transport->connect(ROBOT_IP, PORT);
     // 192.168.1.12 for another arm mounted to table
 
     // Set session data connection information
     auto create_session_info = k_api::Session::CreateSessionInfo();
-    create_session_info.set_username("admin");
-    create_session_info.set_password("admin");
+    create_session_info.set_username(USER_NAME);
+    create_session_info.set_password(PASSWORD);
     create_session_info.set_session_inactivity_timeout(60000);   // (milliseconds)
     create_session_info.set_connection_inactivity_timeout(2000); // (milliseconds)
 
@@ -430,11 +543,13 @@ int main(int argc, char **argv)
 
     // Set the target pose
     // Pose targetPose = {0.573, -0.03, 0.149, 90.093, 0.003, 89.917};
-    Pose targetPose = {0.548, -0.289, 0.133, 90.11, -0.002, 87.125};
+    Pose targetPose = TARGET_POSE;
 
     // core
     // Example core
     bool success = true;
+    success &= example_move_to_home_position(base);
+    success &= arm_initialisation(base, targetPose, base_cyclic);
     
     // force_by_gripper =  find_gripper_mass(base, base_cyclic, interconnect_cyclic);
 
