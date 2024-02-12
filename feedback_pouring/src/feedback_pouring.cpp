@@ -20,6 +20,7 @@
 #include "kdl_parser/kdl_parser.hpp"
 #include "chainexternalwrenchestimator.hpp"
 #include <cmath>
+#include "constants.h"
 // #include <gnuplot-iostream.h>
 
 using namespace KDL;
@@ -29,16 +30,16 @@ namespace k_api = Kinova::Api;
 // Maximum allowed waiting time during actions
 constexpr auto TIMEOUT_DURATION = std::chrono::seconds{20};
 
-// Data structure to represent a 3D pose
-struct Pose
-{
-    double x;
-    double y;
-    double z;
-    double theta_x;
-    double theta_y;
-    double theta_z;
-};
+// // Data structure to represent a 3D pose
+// struct Pose
+// {
+//     double x;
+//     double y;
+//     double z;
+//     double theta_x;
+//     double theta_y;
+//     double theta_z;
+// };
 
 #define PORT 10000
 
@@ -143,7 +144,6 @@ bool example_move_to_home_position(k_api::Base::BaseClient* base)
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     // Move arm to ready position
-    std::cout << "Moving the arm to a safe position" << std::endl;
     auto action_type = k_api::Base::RequestedActionType();
     action_type.set_action_type(k_api::Base::REACH_JOINT_ANGLES);
     auto action_list = base->ReadAllActions(action_type);
@@ -186,17 +186,16 @@ bool example_move_to_home_position(k_api::Base::BaseClient* base)
         }
         const auto promise_event = finish_future.get();
 
-        std::cout << "Move to Home completed" << std::endl;
-        std::cout << "Promise value : " << k_api::Base::ActionEvent_Name(promise_event) << std::endl; 
+        // std::cout << "Move to Home completed" << std::endl;
+        // std::cout << "Promise value : " << k_api::Base::ActionEvent_Name(promise_event) << std::endl; 
 
         return true;
     }
 }
 
 
-bool move_to_cartesian_position(k_api::Base::BaseClient* base, const Pose& targetPose, k_api::BaseCyclic::BaseCyclicClient* base_cyclic)
+bool arm_initialisation(k_api::Base::BaseClient* base, const Pose& targetPose, k_api::BaseCyclic::BaseCyclicClient* base_cyclic)
 {
-    std::cout << "Moving to Desired position" << std::endl;
 
     auto action = k_api::Base::Action();
     action.set_name("Move to Cartesian Position");
@@ -220,10 +219,7 @@ bool move_to_cartesian_position(k_api::Base::BaseClient* base, const Pose& targe
         k_api::Common::NotificationOptions()
     );
 
-    std::cout << "Executing action" << std::endl;
     base->ExecuteAction(action);
-
-    std::cout << "Waiting for movement to finish ..." << std::endl;
 
     // Wait for reference value to be set
     // (Reference alternative)
@@ -243,8 +239,8 @@ bool move_to_cartesian_position(k_api::Base::BaseClient* base, const Pose& targe
         return false;
     }
 
-    std::cout << "Cartesian movement completed" << std::endl;
-    std::cout << "Reference value : " << k_api::Base::ActionEvent_Name(event) << std::endl;
+    // std::cout << "Cartesian movement completed" << std::endl;
+    // std::cout << "Reference value : " << k_api::Base::ActionEvent_Name(event) << std::endl;
 
     return true;
 
@@ -276,7 +272,8 @@ double find_gripper_mass(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseC
 
     // Create the KDL chain
     KDL::Chain chain;
-    initialize_robot_urdf("../../src/feedback_pouring/urdf/GEN3-7DOF-VISION_ARM_URDF_V12.urdf", chain, "base_link", "end_effector_link");
+    // initialize_robot_urdf("../../src/feedback_pouring/urdf/GEN3-7DOF-VISION_ARM_URDF_V12.urdf", chain, "base_link", "end_effector_link");
+    initialize_robot_urdf("../../src/feedback_pouring/urdf/"+URDF_FILE_NAME+".urdf", chain, "base_link", "end_effector_link");
 
     ChainExternalWrenchEstimator extwrench_estimator(chain, gravity, sample_frequency, estimation_gain, filter_constant, eps, n);
 
@@ -353,7 +350,8 @@ bool control_end_effector(k_api::Base::BaseClient *base, k_api::BaseCyclic::Base
 
     // Create the KDL chain
     KDL::Chain chain;
-    initialize_robot_urdf("../../src/feedback_pouring/urdf/GEN3-7DOF-VISION_ARM_URDF_V12.urdf", chain, "base_link", "end_effector_link");
+    // initialize_robot_urdf("../../src/feedback_pouring/urdf/GEN3-7DOF-VISION_ARM_URDF_V12.urdf", chain, "base_link", "end_effector_link");
+    initialize_robot_urdf("../../src/feedback_pouring/urdf/"+URDF_FILE_NAME+".urdf", chain, "base_link", "end_effector_link");
 
     ChainExternalWrenchEstimator extwrench_estimator(chain, gravity, sample_frequency, estimation_gain, filter_constant, eps, n);
 
@@ -519,13 +517,13 @@ int main(int argc, char **argv)
     { cout << "_________ callback error _________" << err.toString(); };
     auto transport = new k_api::TransportClientTcp();
     auto router = new k_api::RouterClient(transport, error_callback);
-    transport->connect("192.168.1.10", PORT);
+    transport->connect(ROBOT_IP, PORT);
     // 192.168.1.12 for another arm mounted to table
 
     // Set session data connection information
     auto create_session_info = k_api::Session::CreateSessionInfo();
-    create_session_info.set_username("admin");
-    create_session_info.set_password("admin");
+    create_session_info.set_username(USER_NAME);
+    create_session_info.set_password(PASSWORD);
     create_session_info.set_session_inactivity_timeout(60000);   // (milliseconds)
     create_session_info.set_connection_inactivity_timeout(2000); // (milliseconds)
 
@@ -544,13 +542,13 @@ int main(int argc, char **argv)
 
     // Set the target pose
     // Pose targetPose = {0.573, -0.03, 0.149, 90.093, 0.003, 89.917};
-    Pose targetPose = {0.548, -0.289, 0.133, 90.11, -0.002, 87.125};
+    Pose targetPose = TARGET_POSE;
 
     // core
     // Example core
     bool success = true;
     success &= example_move_to_home_position(base);
-    success &= move_to_cartesian_position(base, targetPose, base_cyclic);
+    success &= arm_initialisation(base, targetPose, base_cyclic);
     
     // force_by_gripper =  find_gripper_mass(base, base_cyclic, interconnect_cyclic);
 
