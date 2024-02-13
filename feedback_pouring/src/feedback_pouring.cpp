@@ -41,16 +41,18 @@ constexpr auto TIMEOUT_DURATION = std::chrono::seconds{20};
 //     double theta_z;
 // };
 
-#define PORT 10000
-
-#define DEG_TO_RAD(x) (x) * 3.14159265358979323846 / 180.0
-#define RAD_TO_DEG(x) (x) * 180.0 / 3.14159265358979323846
+#define PORT PORT_ID
+// #define PORT 10000
+#define DEG_TO_RAD(x) (x) * PI / DEGREES
+// #define DEG_TO_RAD(x) (x) * 3.14159265358979323846 / 180.0
+#define RAD_TO_DEG(x) (x) * DEGREES / PI
+// #define RAD_TO_DEG(x) (x) * 180.0 / 3.14159265358979323846
 
 // Actuator speed (deg/s)
-const float SPEED = 1.8f;
-// const float SPEED = 0.0f;
-const float SPEED_STOP = -40.0f;
-// const float SPEED_STOP = 0.0f;
+const float SPEED = STARTING_SPEED;
+// const float SPEED = 1.8f;
+const float SPEED_STOP = STOPPING_SPEED;
+// const float SPEED_STOP = -40.0f;
 
 // Gnuplot gp;
 
@@ -135,7 +137,7 @@ bool gripper_control(k_api::Base::BaseClient *base)
     return true;
 }
 
-bool example_move_to_home_position(k_api::Base::BaseClient* base)
+bool move_to_home_position(k_api::Base::BaseClient* base)
 {
     // Make sure the arm is in Single Level Servoing before executing an Action
     auto servoingMode = k_api::Base::ServoingModeInformation();
@@ -250,6 +252,18 @@ bool arm_initialisation(k_api::Base::BaseClient* base, const Pose& targetPose, k
 double find_gripper_mass(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclicClient *base_cyclic, k_api::InterconnectCyclic::InterconnectCyclicClient *interconnect_cyclic)
 {
 
+    /**
+    * Constructor for the estimator, it will allocate all the necessary memory
+    * param chain The kinematic chain of the robot, an internal copy will be made.
+    * param gravity The gravity-acceleration vector to use during the calculation.
+    * param sample_frequency Frequency at which users updates it estimation loop (in Hz).
+    * param estimation_gain Parameter used to control the estimator's convergence
+    * param filter_constant Parameter defining how much the estimated signal should be filtered by the low-pass filter.
+    *                        This input value should be between 0 and 1. Higher the number means more noise needs to be filtered-out.
+    *                        The filter can be turned off by setting this value to 0.
+    * param eps If a SVD-singular value is below this value, its inverse is set to zero. Default: 0.00001
+    */
+
     k_api::Base::JointSpeeds joint_speeds;
     k_api::Base::JointSpeeds joint_speeds1;
     k_api::Base::JointTorques joint_torques;
@@ -258,8 +272,8 @@ double find_gripper_mass(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseC
     double sample_frequency = 20.0; // Hz
     double estimation_gain = 1.0;
     double filter_constant = 0.5;
-    double eps = 0.00001;
-    int n = 150;
+    double eps = 0.00001; 
+    int n = 150; 
     double prev_force_x = 0.0;
     double prev_force_y = 0.0;
     double prev_force_z = 0.0;
@@ -304,6 +318,7 @@ double find_gripper_mass(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseC
             feedback_init.interconnect().imu_acceleration_y(),
             feedback_init.interconnect().imu_acceleration_z());
 
+        // considering x and y direction only leaving the z axis
         auto acceleration = std::sqrt(imu_acceleration.x() * imu_acceleration.x() + imu_acceleration.y() * imu_acceleration.y());
 
 
@@ -334,7 +349,7 @@ double find_gripper_mass(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseC
     return force_req;
 }
 
-bool control_end_effector(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclicClient *base_cyclic, k_api::InterconnectCyclic::InterconnectCyclicClient *interconnect_cyclic)
+bool feedback_pouring(k_api::Base::BaseClient *base, k_api::BaseCyclic::BaseCyclicClient *base_cyclic, k_api::InterconnectCyclic::InterconnectCyclicClient *interconnect_cyclic)
 {
 
     k_api::Base::JointSpeeds joint_speeds;
@@ -394,7 +409,7 @@ bool control_end_effector(k_api::Base::BaseClient *base, k_api::BaseCyclic::Base
     float percentage = 20;
     bool loop = true;
     bool stop_loop = false;
-    double gripper_mass = 8.75;
+    // double gripper_mass = 8.75;
     bool initial_wrench_set = true;
     bool target_mass_set = false;
     double target_mass = 0.0f;
@@ -439,11 +454,13 @@ bool control_end_effector(k_api::Base::BaseClient *base, k_api::BaseCyclic::Base
         // std::cout << "Force_x: " << wrench.force.x() << " Force_y: " << wrench.force.y() << " Force_z: " << wrench.force.z() << std::endl;
 
         // double force = std::sqrt(wrench.force.x()*wrench.force.x() + wrench.force.y()*wrench.force.y());
+        // To match the force to Zero when there is no object given to gripper --> 83.75 (found this value with trial and error)
         double force = wrench.force.Norm() - 83.75;
 
         auto mass = force / acceleration;
         
-
+        // To stabilise the weight before getting the actual weight 
+        // (eg: In measuring scale, the weight won't be measured immediately, it shows the actual weight with some delay)
         float mass_extract_current = (floor(mass * 1000.0)) / 1000.0;
 
         if (!target_mass_set)
@@ -464,6 +481,8 @@ bool control_end_effector(k_api::Base::BaseClient *base, k_api::BaseCyclic::Base
             }
         }
         std::cout << "***** Pouring in progress *****" << std::endl;
+
+        // To match the user defined percentage with the measured weight (to get the accuracy -> mass > target mass + 15% of target mass)
         if (target_mass)
         {
             if (mass > (target_mass + 0.15 * target_mass))
@@ -547,12 +566,12 @@ int main(int argc, char **argv)
     // core
     // Example core
     bool success = true;
-    success &= example_move_to_home_position(base);
+    success &= move_to_home_position(base);
     success &= arm_initialisation(base, targetPose, base_cyclic);
     
     // force_by_gripper =  find_gripper_mass(base, base_cyclic, interconnect_cyclic);
 
-    success &= control_end_effector(base, base_cyclic, interconnect_cyclic);
+    success &= feedback_pouring(base, base_cyclic, interconnect_cyclic);
 
     // Close API session
     session_manager->CloseSession();
