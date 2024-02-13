@@ -24,5 +24,6 @@ const float STARTING_SPEED = 1.8f;
 const float STOPPING_SPEED = -40.0f;
 const float PI = 3.14159265358979323846f;
 const float DEGREES= 180.0;
+const float PERCENT = 20;
 
 #endif // CONSTANTS_H
