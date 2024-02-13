@@ -14,13 +14,13 @@ This repository depends on the below components.
 
 `Kinova Robotic Arm`
 `Kinova Kortex API`
-`[Orocos KDL (Kinematics and Dynamics Library)](https://github.com/orocos/orocos_kinematics_dynamics/tree/master)`
+`Orocos KDL Kinematics and Dynamics Library`
 
 ## Technologies
 - Robot Platform: [KINOVA](https://www.kinovarobotics.com/resources)
 - OS: Ubuntu 20.04 / 22.04 LTS
 - Middleware: Kinova Kortex API
-- Libraries: Kinematics and Dynamics Libraries (KDL)
+- Libraries: [Kinematics and Dynamics Libraries (KDL)](https://github.com/orocos/orocos_kinematics_dynamics/tree/master)
 
 ## Setup and Usage of Customized Package
 Please refer to the detailed steps provided to set the environment and use it for the project on the [Wiki page](https://github.com/HBRS-SDP/ws23-feedback-pouring/wiki)
